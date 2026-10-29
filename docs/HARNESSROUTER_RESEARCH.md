@@ -105,7 +105,8 @@ AgentArena supports both through `HR_BASE_URL`; `http://` is allowed only for lo
 
 | Capability | Status |
 |---|---|
-| Discovery (`/v1/uhp`), listing harnesses | Implemented and contract-tested. **[UNVERIFIED live]** |
+| Discovery (`/v1/uhp`) | **Verified live 2026-10-29** against Cloud (no key needed): `versions` `["2026-10-19","2026-09-28","2026-09-12","2026-08-11"]`, `default_version` `2026-09-28`, no `version_to_send`, `implementation` "HarnessRouter Cloud" 0.3.0. The client's parser picks `2026-09-28`. |
+| Listing harnesses | **Verified live 2026-10-29** with a real Workspace key: Bearer auth accepted. Items carry `id` (`chrn_` + 32 hex), `name` (console-generated, e.g. "Completed code files"), `base` (`codex`, `claude-code`) and camelCase `defaultModel` (`gpt-5.3-codex`, `claude-opus-5.5`), as documented. |
 | Streaming task with `metadata.harness_id` and `Idempotency-Key` | Implemented and contract-tested. **[UNVERIFIED live]** |
 | Starter-file upload as `input_file` | Implemented and contract-tested. **[UNVERIFIED live]** |
 | Stream-drop recovery by polling | Implemented and contract-tested. **[UNVERIFIED live]** |

@@ -29,6 +29,13 @@ Final verification run: **2026-10-29**, on Windows 11, Node 24.14.0, Docker 29.6
 3. An `eval()`-based solution could rank first (security gate added).
 4. A cancel that arrived after all runs had finished (during evaluation) relabelled a completed benchmark as CANCELLED.
 
+## Live HarnessRouter checks (2026-10-29)
+
+- `GET https://api.harnessrouter.ai/v1/uhp` (no key): HTTP 200, default version `2026-09-28`, which the client selects.
+- `npm run demo:live` with no key: reports the version, then stops with "HR_API_KEY is empty".
+- `npm run demo:live` with a real Workspace key (dry run, nothing billed): listed 2 configured agents (claude-code · claude-opus-5.5, codex · gpt-5.3-codex) and printed the plan.
+- `npm run demo:live` against a local fake HarnessRouter on 127.0.0.1: lists 2 agents and prints the plan; a wrong key gives "HarnessRouter rejected the API key"; `--confirm-spend` with live switches off is refused.
+
 ## Not verified
 
 - **Live HarnessRouter execution.** No credentials, and no billable calls were authorized. Contract tests use documented shapes, not recorded traffic.

@@ -11,6 +11,24 @@ npm run dev   # http://127.0.0.1:3100
 
 Open the dashboard. If history is empty, run `npm run db:seed` first (about 2 minutes; it uses the real pipeline).
 
+## Optional: the live HarnessRouter case (real agents, costs money)
+
+A ready-made case that sends the **slug generator** task to two real agents on HarnessRouter, then grades their code in the sandbox. Prepare it **before** the talk: real agents take minutes, not seconds.
+
+1. In the HarnessRouter console, create a Workspace API key and at least two configured agents (for example Codex and Claude Code).
+2. In `.env`, set `HR_API_KEY=...`, `AGENTARENA_MODE=LIVE` and `ALLOW_LIVE_EXECUTION=true`.
+3. Run the free dry run, which lists your agents and shows the plan without starting anything:
+   ```bash
+   npm run demo:live
+   ```
+4. Run it for real. This bills one task per agent; `--max-cost` (default 0.5 USD) is sent as `max_cost_usd`, a provider budget hint, not a guaranteed cap:
+   ```bash
+   npm run demo:live -- --confirm-spend
+   ```
+5. Restart `npm run dev` and open the printed benchmark link. Everything on that page is LIVE: provider-reported cost, real agent output, real test results.
+
+Options: `--task <key>` (any built-in task), `--agents <harnessId,harnessId>`, `--max-cost <usd>`, `--timeout <sec>`. In LIVE mode the simulated history is hidden, so switch back to `AGENTARENA_MODE=DEMO` for the main walkthrough.
+
 ## 0:00 – 0:40 · The problem
 
 "Teams pick coding agents by vibes and demos. A response that *sounds* right isn't the same as code that passes tests. HarnessRouter already makes Codex, Claude Code, Hermes and others interchangeable behind one API, and its Arena compares time and cost side by side. AgentArena adds the missing layer: **objective evidence**. We execute what each agent produced, grade it, and route future tasks on that record."

@@ -24,6 +24,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "eval:rerun": "tsx scripts/reevaluate.ts",
+    "demo:live": "tsx scripts/live-demo.ts",
     "sandbox:pull": "docker pull node:22-alpine && docker pull python:3.12-alpine",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "postinstall": "prisma generate"

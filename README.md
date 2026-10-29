@@ -48,7 +48,7 @@ Without Docker, set `SANDBOX_MODE=disabled`. Correctness is then reported as *un
 | `SANDBOX_MODE` | `docker` | `docker` or `disabled` |
 | `MAX_CONCURRENT_RUNS` | `2` | Process-wide cap (the HarnessRouter free trial allows 2 concurrent tasks) |
 
-To go live: set the three LIVE variables, restart, open **Settings → Discover configured agents**, register two or more, then launch with the spend confirmation checked.
+To go live: set the three LIVE variables, restart, open **Settings → Discover configured agents**, register two or more, then launch with the spend confirmation checked. Or use the ready-made case: `npm run demo:live` (free dry run: lists your agents and the plan) and `npm run demo:live -- --confirm-spend` (runs the slug task on two real agents and grades them).
 
 ## Benchmark methodology
 
@@ -74,6 +74,7 @@ npm run test:integration    # 18 tests: Docker sandbox + orchestrator on Postgre
 npm run test:e2e            # 8 Playwright tests of the demo journey (needs dev DB + seed)
 npm run build
 npm run eval:rerun          # re-score stored benchmarks; should report 0 changes
+npm run demo:live           # live HarnessRouter case; dry run unless --confirm-spend
 ```
 
 Latest verified results: [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md). CI: [.github/workflows/ci.yml](.github/workflows/ci.yml).

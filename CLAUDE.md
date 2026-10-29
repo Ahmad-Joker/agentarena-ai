@@ -8,6 +8,7 @@ Multi-agent coding benchmark, objective evaluation, and evidence-based routing o
 - `npm run dev` serves http://127.0.0.1:3100. Loopback only, on purpose.
 - `npm run typecheck`, `npm run lint`, `npm test` (unit), `npm run test:integration` (Docker + `agentarena_test` DB), `npm run test:e2e`, `npm run build`.
 - `npm run eval:rerun` re-scores stored benchmarks (reproducibility check).
+- `npm run demo:live` is the live HarnessRouter case. Free dry run by default; `--confirm-spend` is billable and needs the user's explicit authorization.
 - Never run `prisma migrate reset` on the dev DB. Tests use the separate `agentarena_test` DB with `migrate deploy`.
 
 ## Layout
