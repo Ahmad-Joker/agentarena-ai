@@ -1,0 +1,316 @@
+// AgentArena AI — relational model for benchmarks, runs, evaluation evidence and routing.
+// No credentials are ever stored here: HarnessRouter keys live only in server env vars.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// DEMO rows come from deterministic simulated agents; LIVE rows from real HarnessRouter executions.
+/// The two are never mixed in analytics or routing.
+enum ExecutionMode {
+  DEMO
+  LIVE
+}
+
+enum AgentProvider {
+  SIMULATED
+  HARNESSROUTER
+}
+
+enum TaskLanguage {
+  TYPESCRIPT
+  JAVASCRIPT
+  PYTHON
+}
+
+enum TaskCategory {
+  ALGORITHM
+  BUG_FIX
+  PARSING
+  STRING_PROCESSING
+  VALIDATION
+  DATA_TRANSFORMATION
+  OTHER
+}
+
+enum BenchmarkStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+/// PENDING → RUNNING → COMPLETED | FAILED | CANCELLED | TIMED_OUT (enforced in src/lib/domain/run-state.ts)
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMED_OUT
+}
+
+enum BenchmarkProfile {
+  BALANCED
+  CORRECTNESS
+  SPEED
+  COST
+}
+
+enum CostSource {
+  PROVIDER_REPORTED
+  SIMULATED
+  UNAVAILABLE
+}
+
+enum EvaluationStatus {
+  PENDING
+  COMPLETED
+  PARTIAL
+  ERROR
+}
+
+enum ArtifactSource {
+  PROVIDER_FILE
+  EXTRACTED_FROM_OUTPUT
+  SIMULATED_FIXTURE
+}
+
+enum RoutingConfidence {
+  INSUFFICIENT
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agents     AgentConfiguration[]
+  tasks      CodingTask[]
+  benchmarks Benchmark[]
+  routings   RoutingRecommendation[]
+}
+
+model AgentConfiguration {
+  id          String        @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  provider    AgentProvider
+  mode        ExecutionMode
+  /// HarnessRouter configured-agent id (metadata.harness_id). Null for simulated agents.
+  harnessId   String?
+  /// Base harness reported by HarnessRouter (e.g. what GET /v1/harnesses returns); informational.
+  base        String?
+  /// Optional per-request model override. Null = the harness's own default model.
+  model       String?
+  /// Languages this configuration is allowed to be benchmarked on.
+  languages   TaskLanguage[]
+  /// Snapshot of tools / permissions / runtime notes for fairness reporting.
+  runtimeNotes Json?
+  color       String        @default("#8b5cf6")
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs      AgentRun[]
+  recommendedIn RoutingRecommendation[] @relation("recommended")
+  alternativeIn RoutingRecommendation[] @relation("alternative")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, mode, isActive])
+}
+
+model CodingTask {
+  id               String       @id @default(cuid())
+  workspaceId      String
+  title            String
+  description      String
+  language         TaskLanguage
+  category         TaskCategory
+  /// [{ path, content }] — identical starting files given to every agent.
+  starterFiles     Json
+  /// The file each agent must produce, e.g. "solution.ts".
+  entryFile        String
+  /// Exported function the declarative tests call.
+  entryFunction    String
+  expectedBehavior String
+  /// Declarative test cases: [{ name, args, expected }] — data, never code.
+  testSpec         Json?
+  constraints      Json?
+  /// sha256 of the normalized task definition, for reproducibility audits.
+  contentHash      String
+  isFixture        Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  benchmarks Benchmark[]
+
+  @@index([workspaceId, language, category])
+}
+
+model Benchmark {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  taskId         String
+  mode           ExecutionMode
+  status         BenchmarkStatus  @default(PENDING)
+  profile        BenchmarkProfile @default(BALANCED)
+  /// Normalized scoring weights used for this benchmark (frozen at creation).
+  weights        Json
+  timeoutSeconds Int
+  maxConcurrency Int
+  /// Per-run budget forwarded to the provider as max_cost_usd. Not a guaranteed cap.
+  maxCostUsd     Float?
+  /// The exact prompt sent to every agent (fairness audit).
+  promptSnapshot String
+  winnerRunId    String?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  updatedAt      DateTime         @updatedAt
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task      CodingTask @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  runs      AgentRun[]
+
+  @@index([workspaceId, mode, createdAt])
+  @@index([status])
+}
+
+model AgentRun {
+  id                 String     @id @default(cuid())
+  benchmarkId        String
+  agentId            String
+  status             RunStatus  @default(PENDING)
+  attempt            Int        @default(1)
+  /// Sent as Idempotency-Key to HarnessRouter so retries never double-execute.
+  idempotencyKey     String     @unique
+  externalResponseId String?
+  externalSessionId  String?
+  /// Frozen copy of the agent configuration at launch time.
+  configSnapshot     Json
+  finalOutput        String?
+  errorCode          String?
+  errorMessage       String?
+  startedAt          DateTime?
+  endedAt            DateTime?
+  /// Application-measured wall-clock duration (ms).
+  durationMs         Int?
+  /// Provider-reported usage object (tokens), null when not reported.
+  usage              Json?
+  costUsd            Float?
+  costSource         CostSource @default(UNAVAILABLE)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  benchmark  Benchmark          @relation(fields: [benchmarkId], references: [id], onDelete: Cascade)
+  agent      AgentConfiguration @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  events     ExecutionEvent[]
+  artifacts  Artifact[]
+  evaluation EvaluationResult?
+
+  @@unique([benchmarkId, agentId])
+  @@index([agentId, status])
+  @@index([status])
+}
+
+model ExecutionEvent {
+  id        String   @id @default(cuid())
+  runId     String
+  sequence  Int
+  /// Normalized type: lifecycle | status | progress | tool | output | error | system
+  kind      String
+  /// Raw upstream type when applicable (e.g. response.output_item.added).
+  type      String
+  message   String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sequence])
+}
+
+model Artifact {
+  id        String         @id @default(cuid())
+  runId     String
+  path      String
+  content   String?
+  bytes     Int
+  sha256    String
+  mediaType String         @default("text/plain")
+  source    ArtifactSource
+  createdAt DateTime       @default(now())
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, path])
+}
+
+model EvaluationResult {
+  id               String           @id @default(cuid())
+  runId            String           @unique
+  status           EvaluationStatus
+  evaluatorVersion String
+  /// Component scores in [0,1]; null = not measured (never treated as zero).
+  correctness      Float?
+  reliability      Float?
+  quality          Float?
+  efficiency       Float?
+  security         Float?
+  totalScore       Float?
+  /// Fraction of total weight backed by measured evidence.
+  coverage         Float
+  testsPassed      Int              @default(0)
+  testsFailed      Int              @default(0)
+  testsSkipped     Int              @default(0)
+  runtimeAvailable Boolean
+  weights          Json
+  /// Full evidence: per-test results, findings, sandbox metadata, formula inputs.
+  evidence         Json
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model RoutingRecommendation {
+  id                 String            @id @default(cuid())
+  workspaceId        String
+  mode               ExecutionMode
+  query              String
+  language           TaskLanguage?
+  category           TaskCategory?
+  objective          BenchmarkProfile
+  recommendedAgentId String?
+  alternativeAgentId String?
+  confidence         RoutingConfidence
+  explanation        Json
+  createdAt          DateTime          @default(now())
+
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recommendedAgent AgentConfiguration? @relation("recommended", fields: [recommendedAgentId], references: [id], onDelete: SetNull)
+  alternativeAgent AgentConfiguration? @relation("alternative", fields: [alternativeAgentId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+}
+
+model SystemConfiguration {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

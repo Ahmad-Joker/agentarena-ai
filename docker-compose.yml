@@ -1,0 +1,23 @@
+# Local services for AgentArena AI.
+# Postgres binds to loopback only; it is never exposed to the network.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: agentarena-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agentarena
+      POSTGRES_PASSWORD: agentarena_local_only
+      POSTGRES_DB: agentarena
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - agentarena-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentarena -d agentarena"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  agentarena-pg:
